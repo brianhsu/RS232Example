@@ -1,2 +1,2 @@
-libraryDependencies += "com.embeddedunveiled" % "scm" % "1.0.3"
+libraryDependencies += "org.scream3r" % "jssc" % "2.8.0"
 
