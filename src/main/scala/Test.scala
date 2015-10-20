@@ -85,11 +85,20 @@ object Main {
     rsConnection.processResponse { line =>
       println("Got data...:" + line)
     }
-    var count = 0
-    while (true) {
-      Thread.sleep(1000)
-      count += 1
-    }
+
+    Iterator
+      .continually { 
+        print("Prompt> ")
+        readLine
+      }
+      .takeWhile(_ != "CLOSE.")
+      .foreach { line =>
+        println("Got command from CONSOLE:" + line)
+        rsConnection.sendCommand(line)
+      }
+
+    rsConnection.close()
+
 
   }
 }
