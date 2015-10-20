@@ -6,6 +6,8 @@ import jssc.SerialPortEventListener
 
 class RS232Connection(port: String, baudRate: Int) {
 
+  val serialPort = new SerialPort(port)
+
   def processResponse(callback: String => Any) {
     val eventMask = 
       SerialPortEvent.BREAK + SerialPortEvent.CTS + SerialPortEvent.DSR + SerialPortEvent.ERR +
@@ -21,7 +23,7 @@ class RS232Connection(port: String, baudRate: Int) {
 
         data.foreach { character =>
           if (character == '\n') {
-            callback(buffer.toString)
+            callback(buffer.toString.trim)
             buffer.setLength(0)
           } else {
             buffer.append(character)
@@ -57,10 +59,6 @@ class RS232Connection(port: String, baudRate: Int) {
     serialPort.addEventListener(eventListener)
   }
 
-  val serialPort = new SerialPort("/dev/ttyUSB0")
-
-  serialPort.openPort()
-  serialPort.setParams(baudRate, SerialPort.DATABITS_8, SerialPort.STOPBITS_1, SerialPort.PARITY_NONE)
 
   def sendCommand(command: String) {
     serialPort.writeBytes(s"$command\n\r".getBytes)
@@ -70,6 +68,11 @@ class RS232Connection(port: String, baudRate: Int) {
     serialPort.closePort()
   }
 
+
+  def open() {
+    serialPort.openPort()
+    serialPort.setParams(baudRate, SerialPort.DATABITS_8, SerialPort.STOPBITS_1, SerialPort.PARITY_NONE)
+  }
 }
 
 
@@ -80,11 +83,20 @@ object Main {
 
     println("Hello World")
 
-    val rsConnection = new RS232Connection("/dev/ttyUSB0", SerialPort.BAUDRATE_38400)
+    val piConnection = new RS232Connection("/dev/ttyMP6", SerialPort.BAUDRATE_38400)
+    val mcConnection = new RS232Connection("/dev/ttyMP7", SerialPort.BAUDRATE_38400)
 
-    rsConnection.processResponse { line =>
-      println("Got data...:" + line)
+    piConnection.open()
+    mcConnection.open()
+
+    piConnection.processResponse { line =>
+      println("Got data from RaspberryPI:" + line)
     }
+
+    mcConnection.processResponse { line =>
+      println("Got data from LCR:" + line)
+    }
+
 
     Iterator
       .continually { 
@@ -93,11 +105,21 @@ object Main {
       }
       .takeWhile(_ != "CLOSE.")
       .foreach { line =>
-        println("Got command from CONSOLE:" + line)
-        rsConnection.sendCommand(line)
+	val cols = line.split(" ")
+        if (cols.size == 2) {
+          println("Got command " + cols(1) + " to " + cols(0))
+          if (cols(0) == "1") {
+            piConnection.sendCommand(cols(1).trim)
+          } else {
+            mcConnection.sendCommand(cols(1).trim)
+          }
+        } else {
+          println("ERROR syntax")
+        }
       }
 
-    rsConnection.close()
+    piConnection.close()
+    mcConnection.close()
 
 
   }
